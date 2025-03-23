@@ -212,6 +212,42 @@ nuevo_html = """
 </script>
 </body>
 </html>
+# Agregar una sección para visualizar la respuesta de glosa y exportarla a PDF
+
+# Insertamos una sección adicional bajo el formulario
+respuesta_html = """
+<h3>Respuesta de Glosa</h3>
+<textarea id="respuestaGlosa" rows="6" style="width:100%;" placeholder="Escriba aquí la respuesta a la glosa..."></textarea>
+<br>
+<button onclick="exportarRespuestaPDF()">Exportar Respuesta a PDF</button>
+"""
+
+# Inyectar la sección antes del div de controles
+nuevo_html = nuevo_html.replace('<div class="controls">', respuesta_html + '\n<div class="controls">')
+
+# Agregar función JavaScript para exportar la respuesta a PDF
+js_funcion_respuesta = """
+  function exportarRespuestaPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const texto = document.getElementById('respuestaGlosa').value || "(Sin contenido)";
+    doc.text("Glosas Tracker ADS", 14, 10);
+    doc.text("Respuesta a Glosa:", 14, 20);
+    const lines = doc.splitTextToSize(texto, 180);
+    doc.text(lines, 14, 30);
+    doc.save("respuesta_glosa.pdf");
+  }
+"""
+
+# Inyectar la función antes de cerrar el <script>
+nuevo_html = nuevo_html.replace("renderTabla();", f"{js_funcion_respuesta}\n  renderTabla();")
+
+# Guardar el archivo final
+respuesta_path = "/mnt/data/index_con_respuesta_glosa.html"
+with open(respuesta_path, "w", encoding="utf-8") as f:
+    f.write(nuevo_html)
+
+respuesta_path
 """
 
 # Guardar el archivo actualizado
