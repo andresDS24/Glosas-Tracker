@@ -1,14 +1,14 @@
+# Reemplazar el contenido HTML anterior con la nueva estructura solicitada
+
+nuevo_html = """
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <title>Registro de Glosas</title>
-
-  <!-- Librerías -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
   <style>
     body { font-family: Arial; padding: 20px; max-width: 1200px; margin: auto; }
     input, select, textarea, button {
@@ -27,9 +27,7 @@
   </style>
 </head>
 <body>
-
 <h2>Registro de Glosas</h2>
-
 <form id="glosaForm">
   <input type="hidden" id="editIndex">
   <label>Número de factura:</label>
@@ -40,29 +38,31 @@
   <input type="number" id="valorGlosado" required>
   <label>Concepto de glosa:</label>
   <input type="text" id="concepto" required>
-  <label>Valor aceptado:</label>
-  <select id="valorAceptado" required>
+  <label>Tipo de respuesta:</label>
+  <select id="tipoRespuesta" required>
     <option value="">-- Seleccione --</option>
-    <option value="Total">Total</option>
-    <option value="Parcial">Parcial</option>
+    <option value="Aceptado Total">Aceptado Total</option>
+    <option value="Aceptado Parcial">Aceptado Parcial</option>
+    <option value="No Aceptado">No Aceptado</option>
   </select>
+  <label>Valor aceptado:</label>
+  <input type="number" id="valorAceptado" required>
   <label>Sustentación de respuesta:</label>
   <textarea id="sustentacion" rows="3" required></textarea>
   <button type="submit">Guardar registro</button>
 </form>
-
 <div class="controls">
   <input type="text" id="filtroFactura" placeholder="Filtrar por N° factura">
   <input type="text" id="filtroConcepto" placeholder="Filtrar por concepto">
   <select id="filtroEstado">
     <option value="">Todos los estados</option>
-    <option value="Total">Total</option>
-    <option value="Parcial">Parcial</option>
+    <option value="Aceptado Total">Aceptado Total</option>
+    <option value="Aceptado Parcial">Aceptado Parcial</option>
+    <option value="No Aceptado">No Aceptado</option>
   </select>
   <button onclick="exportarPDF()">Exportar PDF</button>
   <button onclick="exportarExcel()">Exportar Excel</button>
 </div>
-
 <table id="tablaGlosas">
   <thead>
     <tr>
@@ -70,16 +70,15 @@
       <th>Valor Factura</th>
       <th>Valor Glosado</th>
       <th>Concepto</th>
-      <th>Aceptado</th>
+      <th>Tipo de Respuesta</th>
+      <th>Valor Aceptado</th>
       <th>Sustentación</th>
       <th>Acciones</th>
     </tr>
   </thead>
   <tbody></tbody>
 </table>
-
 <div id="paginacion"></div>
-
 <script>
   let glosas = JSON.parse(localStorage.getItem('glosas')) || [];
   const form = document.getElementById('glosaForm');
@@ -100,7 +99,7 @@
     return glosas.filter(g =>
       g.factura.toLowerCase().includes(factura) &&
       g.concepto.toLowerCase().includes(concepto) &&
-      (estado === "" || g.valorAceptado === estado)
+      (estado === "" || g.tipoRespuesta === estado)
     );
   }
 
@@ -112,12 +111,13 @@
     tbody.innerHTML = "";
     paginaDatos.forEach((g, index) => {
       const row = tbody.insertRow();
-      row.className = g.valorAceptado === "Total" ? "respondida" : "pendiente";
+      row.className = g.tipoRespuesta === "Aceptado Total" ? "respondida" : "pendiente";
       row.innerHTML = `
         <td>${g.factura}</td>
         <td>${g.valorFactura}</td>
         <td>${g.valorGlosado}</td>
         <td>${g.concepto}</td>
+        <td>${g.tipoRespuesta}</td>
         <td>${g.valorAceptado}</td>
         <td>${g.sustentacion}</td>
         <td>
@@ -126,7 +126,6 @@
         </td>
       `;
     });
-
     renderPaginacion(datos.length);
   }
 
@@ -134,7 +133,6 @@
     const totalPaginas = Math.ceil(totalItems / itemsPorPagina);
     const paginacion = document.getElementById('paginacion');
     paginacion.innerHTML = '';
-
     for (let i = 1; i <= totalPaginas; i++) {
       const btn = document.createElement('button');
       btn.textContent = i;
@@ -154,17 +152,16 @@
       valorFactura: document.getElementById('valorFactura').value,
       valorGlosado: document.getElementById('valorGlosado').value,
       concepto: document.getElementById('concepto').value,
+      tipoRespuesta: document.getElementById('tipoRespuesta').value,
       valorAceptado: document.getElementById('valorAceptado').value,
       sustentacion: document.getElementById('sustentacion').value
     };
-
     if (editIndex.value === "") {
       glosas.push(nueva);
     } else {
       glosas[editIndex.value] = nueva;
       editIndex.value = "";
     }
-
     guardarLocal();
     form.reset();
     renderTabla();
@@ -176,6 +173,7 @@
     document.getElementById('valorFactura').value = g.valorFactura;
     document.getElementById('valorGlosado').value = g.valorGlosado;
     document.getElementById('concepto').value = g.concepto;
+    document.getElementById('tipoRespuesta').value = g.tipoRespuesta;
     document.getElementById('valorAceptado').value = g.valorAceptado;
     document.getElementById('sustentacion').value = g.sustentacion;
     editIndex.value = index;
@@ -192,27 +190,33 @@
   function exportarPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    const headers = ["Factura", "Valor Factura", "Valor Glosado", "Concepto", "Aceptado", "Sustentación"];
-    const data = aplicarFiltros().map(g => [g.factura, g.valorFactura, g.valorGlosado, g.concepto, g.valorAceptado, g.sustentacion]);
+    const headers = ["Factura", "Valor Factura", "Valor Glosado", "Concepto", "Tipo Respuesta", "Valor Aceptado", "Sustentación"];
+    const data = aplicarFiltros().map(g => [g.factura, g.valorFactura, g.valorGlosado, g.concepto, g.tipoRespuesta, g.valorAceptado, g.sustentacion]);
 
-    doc.text("Glosas Registradas", 14, 10);
+    doc.text("Glosas Tracker ADS", 14, 10);
     doc.autoTable({ head: [headers], body: data, startY: 20 });
-    doc.save("glosas.pdf");
+    doc.save("glosas_tracker_ads.pdf");
   }
 
   function exportarExcel() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(aplicarFiltros());
     XLSX.utils.book_append_sheet(wb, ws, "Glosas");
-    XLSX.writeFile(wb, "glosas.xlsx");
+    XLSX.writeFile(wb, "glosas_tracker_ads.xlsx");
   }
 
   document.getElementById('filtroFactura').addEventListener('input', renderTabla);
   document.getElementById('filtroConcepto').addEventListener('input', renderTabla);
   document.getElementById('filtroEstado').addEventListener('change', renderTabla);
-
   renderTabla();
 </script>
-
 </body>
 </html>
+"""
+
+# Guardar el archivo actualizado
+output_final_path = "/mnt/data/index_glosas_tracker_actualizado.html"
+with open(output_final_path, "w", encoding="utf-8") as f:
+    f.write(nuevo_html)
+
+output_final_path
